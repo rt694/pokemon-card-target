@@ -1,7 +1,9 @@
 import argparse
+import json
 import random
 import signal
 import time
+from pathlib import Path
 
 from .checkout import DryRunCheckout
 from .config import load_config
@@ -9,6 +11,7 @@ from .engine import log, scan_once
 from .ingestion import ingest_target_file
 from .notifications import Notification, build_notifier
 from .retailers import MockRetailer, TargetFeedRetailer
+from .service import generate_launch_agent
 from .storage import PurchaseStore
 
 
@@ -20,6 +23,14 @@ def main() -> int:
         "--test-notification", action="store_true", help="send a test notification and exit"
     )
     parser.add_argument(
+        "--status", action="store_true", help="show persisted monitor health and exit"
+    )
+    parser.add_argument(
+        "--generate-launch-agent",
+        metavar="PLIST_PATH",
+        help="write a macOS LaunchAgent plist without installing it",
+    )
+    parser.add_argument(
         "--ingest-target",
         metavar="JSON_FILE",
         help="validate and merge Target offers from an authorized JSON export",
@@ -27,6 +38,21 @@ def main() -> int:
     args = parser.parse_args()
 
     config = load_config(args.config)
+    if args.generate_launch_agent:
+        path = generate_launch_agent(
+            project_directory=str(Path.cwd()),
+            config_path=args.config,
+            output_path=args.generate_launch_agent,
+        )
+        log("launch_agent_generated", path=path)
+        return 0
+    if args.status:
+        store = PurchaseStore(config.database_path)
+        try:
+            print(json.dumps(store.status_summary(), indent=2, sort_keys=True))
+        finally:
+            store.close()
+        return 0
     if args.ingest_target:
         target_feeds = [item for item in config.retailers if item.type == "target_feed"]
         if len(target_feeds) != 1:

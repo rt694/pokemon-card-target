@@ -1,6 +1,6 @@
 import sqlite3
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from .models import CheckoutResult, Decision, Offer
 
@@ -72,7 +72,79 @@ class PurchaseStore:
             )
             """
         )
+        self.connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS scan_runs (
+                id INTEGER PRIMARY KEY,
+                started_at TEXT NOT NULL,
+                completed_at TEXT,
+                status TEXT NOT NULL,
+                offers_seen INTEGER NOT NULL DEFAULT 0,
+                matches INTEGER NOT NULL DEFAULT 0,
+                retailer_errors INTEGER NOT NULL DEFAULT 0
+            )
+            """
+        )
         self.connection.commit()
+
+    def begin_scan(self) -> int:
+        now = datetime.now(timezone.utc).isoformat()
+        cursor = self.connection.execute(
+            "INSERT INTO scan_runs(started_at, status) VALUES (?, 'running')", (now,)
+        )
+        self.connection.commit()
+        return int(cursor.lastrowid)
+
+    def finish_scan(
+        self,
+        scan_id: int,
+        offers_seen: int,
+        matches: int,
+        retailer_errors: int,
+    ) -> None:
+        now = datetime.now(timezone.utc).isoformat()
+        status = "healthy" if retailer_errors == 0 else "degraded"
+        self.connection.execute(
+            """UPDATE scan_runs SET completed_at = ?, status = ?, offers_seen = ?,
+               matches = ?, retailer_errors = ? WHERE id = ?""",
+            (now, status, offers_seen, matches, retailer_errors, scan_id),
+        )
+        self.connection.commit()
+
+    def status_summary(self) -> Dict[str, object]:
+        last_scan = self.connection.execute(
+            """SELECT started_at, completed_at, status, offers_seen, matches,
+                      retailer_errors FROM scan_runs ORDER BY id DESC LIMIT 1"""
+        ).fetchone()
+        pending = self.connection.execute(
+            "SELECT COUNT(*) FROM notification_outbox WHERE sent_at IS NULL"
+        ).fetchone()[0]
+        observed = self.connection.execute(
+            "SELECT COUNT(*) FROM observed_products"
+        ).fetchone()[0]
+        attempts = self.connection.execute("SELECT COUNT(*) FROM attempts").fetchone()[0]
+        baselines = self.connection.execute(
+            "SELECT retailer, baseline_completed_at FROM retailer_state ORDER BY retailer"
+        ).fetchall()
+        return {
+            "last_scan": None
+            if last_scan is None
+            else {
+                "started_at": last_scan[0],
+                "completed_at": last_scan[1],
+                "status": last_scan[2],
+                "offers_seen": last_scan[3],
+                "matches": last_scan[4],
+                "retailer_errors": last_scan[5],
+            },
+            "pending_notifications": pending,
+            "observed_products": observed,
+            "purchase_attempts": attempts,
+            "baselines": [
+                {"retailer": retailer, "completed_at": completed_at}
+                for retailer, completed_at in baselines
+            ],
+        }
 
     def has_baseline(self, retailer: str) -> bool:
         row = self.connection.execute(

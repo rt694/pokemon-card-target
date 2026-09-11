@@ -1,5 +1,7 @@
 import tempfile
 import unittest
+import plistlib
+from pathlib import Path
 
 from pokemon_bot.checkout import DryRunCheckout
 from pokemon_bot.models import Offer, PurchaseRule
@@ -8,6 +10,7 @@ from pokemon_bot.ingestion import InvalidOffer, ingest_target_file, normalize_ta
 from pokemon_bot.notifications import DiscordNotifier, Notification
 from pokemon_bot.retailers import TargetFeedRetailer
 from pokemon_bot.rules import classify_product, evaluate, normalize_title
+from pokemon_bot.service import generate_launch_agent
 from pokemon_bot.storage import PurchaseStore
 
 
@@ -107,6 +110,17 @@ class StoreTests(unittest.TestCase):
         self.assertTrue(result.success)
         self.assertEqual(result.status, "dry_run")
 
+    def test_scan_health_is_persisted(self) -> None:
+        with tempfile.NamedTemporaryFile(suffix=".db") as handle:
+            store = PurchaseStore(handle.name)
+            scan_id = store.begin_scan()
+            store.finish_scan(scan_id, offers_seen=4, matches=1, retailer_errors=0)
+            status = store.status_summary()
+            self.assertEqual(status["last_scan"]["status"], "healthy")
+            self.assertEqual(status["last_scan"]["offers_seen"], 4)
+            self.assertEqual(status["pending_notifications"], 0)
+            store.close()
+
 
 class NotificationTests(unittest.TestCase):
     def test_discord_notification_has_clickable_link_and_no_mentions(self) -> None:
@@ -189,6 +203,19 @@ class TargetIngestionTests(unittest.TestCase):
                 self.assertEqual(json.load(handle)[0]["sku"], "94681736")
             with open(quarantine, "r", encoding="utf-8") as handle:
                 self.assertIn("tcin must contain exactly 8 digits", handle.read())
+
+
+class ServiceTests(unittest.TestCase):
+    def test_launch_agent_uses_absolute_paths_and_restarts(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output = "%s/monitor.plist" % directory
+            generated = generate_launch_agent(directory, "%s/config.json" % directory, output)
+            with open(generated, "rb") as handle:
+                payload = plistlib.load(handle)
+            self.assertTrue(payload["RunAtLoad"])
+            self.assertTrue(payload["KeepAlive"])
+            self.assertEqual(payload["WorkingDirectory"], str(Path(directory).resolve()))
+            self.assertIn("--config", payload["ProgramArguments"])
 
 
 if __name__ == "__main__":

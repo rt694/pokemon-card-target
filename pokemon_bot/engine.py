@@ -22,13 +22,17 @@ def scan_once(
     notifier: Notifier,
 ) -> int:
     deliver_pending_notifications(store, notifier)
+    scan_id = store.begin_scan()
     purchases = 0
+    offers_seen = 0
+    retailer_errors = 0
     for retailer in retailers:
         had_baseline = store.has_baseline(retailer.name)
         scan_completed = False
         try:
             offers = retailer.offers()
             for offer in offers:
+                offers_seen += 1
                 eligible_new = store.observe(
                     offer,
                     config.new_product_window_days,
@@ -47,10 +51,18 @@ def scan_once(
                 purchases += 1
             scan_completed = True
         except Exception as error:
+            retailer_errors += 1
             log("retailer_error", retailer=retailer.name, error=repr(error))
         if scan_completed and not had_baseline:
             store.complete_baseline(retailer.name)
             log("catalog_baseline_completed", retailer=retailer.name)
+    store.finish_scan(scan_id, offers_seen, purchases, retailer_errors)
+    log(
+        "scan_finished",
+        offers_seen=offers_seen,
+        matches=purchases,
+        retailer_errors=retailer_errors,
+    )
     return purchases
 
 

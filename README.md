@@ -80,6 +80,26 @@ browser. Never share or commit the webhook URL.
 Notifications use a durable SQLite outbox. If Discord or the network is temporarily
 unavailable, an unsent alert remains pending and is retried on the next scan.
 
+## Health and background operation
+
+Every scan persists its start/completion time, health, number of offers, matches,
+and retailer errors. View the latest state without starting the monitor:
+
+```bash
+python3 -m pokemon_bot --config config.json --status
+```
+
+Generate a macOS LaunchAgent definition with absolute paths:
+
+```bash
+python3 -m pokemon_bot --config config.json \
+  --generate-launch-agent data/com.pokemon-card-target.monitor.plist
+```
+
+Generation does not install or start the service. Review the plist first. Discord
+secrets are deliberately not written into it; notification credentials must be
+provided securely to the background process before installation.
+
 ## Authorized Target feed intake
 
 The monitor can ingest a product export supplied by an approved Target integration.
