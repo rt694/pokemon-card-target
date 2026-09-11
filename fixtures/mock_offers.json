@@ -1,0 +1,22 @@
+[
+  {
+    "id": "demo-prismatic-etb-001",
+    "title": "Pokemon TCG: Scarlet & Violet—Prismatic Evolutions Elite Trainer Box",
+    "url": "https://example.invalid/products/prismatic-etb",
+    "price_cents": 5499,
+    "currency": "USD",
+    "in_stock": true,
+    "sku": "699-DEMO01",
+    "category": "tcg-cards"
+  },
+  {
+    "id": "demo-booster-001",
+    "title": "Pokemon TCG: Assorted Booster Pack",
+    "url": "https://example.invalid/products/booster",
+    "price_cents": 499,
+    "currency": "USD",
+    "in_stock": true,
+    "sku": "699-DEMO02",
+    "category": "tcg-cards"
+  }
+]

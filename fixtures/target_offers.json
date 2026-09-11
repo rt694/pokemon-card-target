@@ -1,0 +1,30 @@
+[
+  {
+    "id": "target-demo-94681735",
+    "tcin": "94681735",
+    "sku": "94681735",
+    "title": "Pokemon Trading Card Game: Future Expansion Elite Trainer Box",
+    "url": "https://www.target.com/p/-/A-94681735",
+    "price_cents": 5499,
+    "currency": "USD",
+    "in_stock": true,
+    "category": "trading-card-game",
+    "seller": "Target",
+    "fulfillment_methods": ["shipping", "pickup"],
+    "purchase_limit": 1
+  },
+  {
+    "id": "target-demo-accessory",
+    "tcin": "00000000",
+    "sku": "00000000",
+    "title": "Pokemon TCG Double Deck Box",
+    "url": "https://www.target.com/p/-/A-00000000",
+    "price_cents": 1299,
+    "currency": "USD",
+    "in_stock": true,
+    "category": "trading-card-game",
+    "seller": "Target Plus Partner",
+    "fulfillment_methods": ["shipping"],
+    "purchase_limit": 2
+  }
+]

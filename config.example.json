@@ -1,0 +1,41 @@
+{
+  "database_path": "pokemon_bot.db",
+  "poll_interval_seconds": 30,
+  "poll_jitter_seconds": 5,
+  "daily_budget_cents": 15000,
+  "dry_run": true,
+  "new_products_only": true,
+  "new_product_window_days": 30,
+  "notification": {
+    "type": "console"
+  },
+  "rules": [
+    {
+      "name": "New sealed Pokemon TCG products",
+      "keywords": [],
+      "product_types": [
+        "pokemon_center_etb",
+        "elite_trainer_box",
+        "booster_display",
+        "booster_bundle",
+        "sleeved_booster",
+        "booster_pack",
+        "ultra_premium_collection",
+        "collection",
+        "tin"
+      ],
+      "exclude_keywords": ["deck box", "sleeves", "playmat", "binder", "portfolio"],
+      "allowed_sellers": ["Target"],
+      "allowed_fulfillment": ["shipping", "pickup"],
+      "max_price_cents": 17000,
+      "quantity": 1
+    }
+  ],
+  "retailers": [
+    {
+      "type": "target_feed",
+      "name": "target",
+      "feed_path": "fixtures/target_offers.json"
+    }
+  ]
+}
