@@ -41,6 +41,8 @@ class TargetFeedRetailer(MockRetailer):
     """Consumes Target offers exported by an approved source; never calls Target."""
 
     def offers(self) -> Iterable[Offer]:
+        if not self.feed_path.exists():
+            return
         for offer in super().offers():
             if offer.retailer != "target":
                 raise ValueError("Target feed retailer name must be 'target'")

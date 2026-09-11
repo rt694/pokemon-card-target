@@ -6,6 +6,7 @@ import time
 from .checkout import DryRunCheckout
 from .config import load_config
 from .engine import log, scan_once
+from .ingestion import ingest_target_file
 from .notifications import Notification, build_notifier
 from .retailers import MockRetailer, TargetFeedRetailer
 from .storage import PurchaseStore
@@ -18,9 +19,31 @@ def main() -> int:
     parser.add_argument(
         "--test-notification", action="store_true", help="send a test notification and exit"
     )
+    parser.add_argument(
+        "--ingest-target",
+        metavar="JSON_FILE",
+        help="validate and merge Target offers from an authorized JSON export",
+    )
     args = parser.parse_args()
 
     config = load_config(args.config)
+    if args.ingest_target:
+        target_feeds = [item for item in config.retailers if item.type == "target_feed"]
+        if len(target_feeds) != 1:
+            parser.error("--ingest-target requires exactly one target_feed retailer")
+        feed_path = target_feeds[0].feed_path
+        quarantine_path = feed_path + ".quarantine.jsonl"
+        accepted, rejected = ingest_target_file(
+            args.ingest_target, feed_path, quarantine_path
+        )
+        log(
+            "target_ingestion_finished",
+            accepted=accepted,
+            rejected=rejected,
+            feed_path=feed_path,
+            quarantine_path=quarantine_path if rejected else "",
+        )
+        return 0 if rejected == 0 else 2
     retailers = [
         TargetFeedRetailer(item.name, item.feed_path)
         if item.type == "target_feed"

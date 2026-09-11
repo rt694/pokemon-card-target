@@ -35,7 +35,7 @@
     {
       "type": "target_feed",
       "name": "target",
-      "feed_path": "fixtures/target_offers.json"
+      "feed_path": "data/target_offers.json"
     }
   ]
 }

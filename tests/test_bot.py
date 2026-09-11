@@ -4,6 +4,7 @@ import unittest
 from pokemon_bot.checkout import DryRunCheckout
 from pokemon_bot.models import Offer, PurchaseRule
 from pokemon_bot.engine import deliver_pending_notifications
+from pokemon_bot.ingestion import InvalidOffer, ingest_target_file, normalize_target_record
 from pokemon_bot.notifications import DiscordNotifier, Notification
 from pokemon_bot.retailers import TargetFeedRetailer
 from pokemon_bot.rules import classify_product, evaluate, normalize_title
@@ -143,6 +144,51 @@ class NotificationTests(unittest.TestCase):
             self.assertEqual(len(recorder.sent), 1)
             self.assertEqual(store.pending_notifications(), [])
             store.close()
+
+
+class TargetIngestionTests(unittest.TestCase):
+    def valid_record(self):
+        return {
+            "tcin": "94681736",
+            "title": "Pokemon TCG: New Set Booster Bundle",
+            "url": "https://www.target.com/p/-/A-94681736",
+            "price_cents": 2699,
+            "in_stock": True,
+            "category": "trading-card-game",
+            "seller": "Target",
+            "fulfillment_methods": ["pickup", "shipping", "shipping"],
+            "purchase_limit": 1,
+        }
+
+    def test_normalizes_target_record_by_tcin(self) -> None:
+        record = normalize_target_record(self.valid_record())
+        self.assertEqual(record["id"], "target-94681736")
+        self.assertEqual(record["sku"], "94681736")
+        self.assertEqual(record["fulfillment_methods"], ["pickup", "shipping"])
+
+    def test_rejects_lookalike_target_hostname(self) -> None:
+        record = self.valid_record()
+        record["url"] = "https://www.target.com.example.org/p/-/A-94681736"
+        with self.assertRaises(InvalidOffer):
+            normalize_target_record(record)
+
+    def test_ingestion_merges_and_quarantines(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = "%s/incoming.json" % directory
+            feed = "%s/feed.json" % directory
+            quarantine = "%s/rejected.jsonl" % directory
+            invalid = self.valid_record()
+            invalid["tcin"] = "bad"
+            import json
+
+            with open(source, "w", encoding="utf-8") as handle:
+                json.dump([self.valid_record(), invalid], handle)
+            accepted, rejected = ingest_target_file(source, feed, quarantine)
+            self.assertEqual((accepted, rejected), (1, 1))
+            with open(feed, "r", encoding="utf-8") as handle:
+                self.assertEqual(json.load(handle)[0]["sku"], "94681736")
+            with open(quarantine, "r", encoding="utf-8") as handle:
+                self.assertIn("tcin must contain exactly 8 digits", handle.read())
 
 
 if __name__ == "__main__":

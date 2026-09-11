@@ -6,3 +6,5 @@ config.json
 *.db-shm
 *.db-wal
 .env
+data/
+*.quarantine.jsonl

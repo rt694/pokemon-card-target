@@ -80,6 +80,28 @@ browser. Never share or commit the webhook URL.
 Notifications use a durable SQLite outbox. If Discord or the network is temporarily
 unavailable, an unsent alert remains pending and is retried on the next scan.
 
+## Authorized Target feed intake
+
+The monitor can ingest a product export supplied by an approved Target integration.
+It does not fetch the Target site itself. Each record must include a valid 8-digit
+TCIN, Target product URL, title, price in cents, stock status, TCG category, seller,
+fulfillment methods, and purchase limit.
+
+```bash
+# Establish an empty baseline once before accepting live candidates.
+python3 -m pokemon_bot --config config.json --once
+
+python3 -m pokemon_bot --config config.json \
+  --ingest-target fixtures/target_ingest.example.json
+python3 -m pokemon_bot --config config.json --once
+```
+
+Imports are merged atomically by TCIN, so title and availability changes update the
+same product. Invalid records are rejected into a JSON Lines quarantine file beside
+the configured feed for inspection. An import that contains rejected records exits
+with status 2. Do not use the example record as a real product; it exists only to
+exercise the pipeline.
+
 ## Roadmap
 
 1. Pick one retailer and confirm that automated access and checkout are permitted.
