@@ -5,6 +5,11 @@ from typing import Dict, Protocol
 
 from .config import NotificationConfig
 from .models import CheckoutResult, Decision
+from .secrets import (
+    read_environment_secret,
+    read_keychain_secret,
+    validate_discord_webhook_url,
+)
 
 
 @dataclass(frozen=True)
@@ -77,7 +82,13 @@ class DiscordNotifier:
 
 def build_notifier(config: NotificationConfig) -> Notifier:
     if config.type == "discord":
-        return DiscordNotifier(config.webhook_url)
+        if config.keychain_service:
+            webhook_url = read_keychain_secret(
+                config.keychain_service, config.keychain_account
+            )
+        else:
+            webhook_url = read_environment_secret(config.webhook_env)
+        return DiscordNotifier(validate_discord_webhook_url(webhook_url))
     return ConsoleNotifier()
 
 

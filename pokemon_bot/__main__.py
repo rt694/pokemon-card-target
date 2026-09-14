@@ -12,6 +12,7 @@ from .ingestion import ingest_target_file
 from .notifications import Notification, build_notifier
 from .retailers import MockRetailer, TargetFeedRetailer
 from .service import generate_launch_agent
+from .secrets import store_keychain_secret
 from .storage import PurchaseStore
 
 
@@ -26,6 +27,11 @@ def main() -> int:
         "--status", action="store_true", help="show persisted monitor health and exit"
     )
     parser.add_argument(
+        "--store-discord-webhook",
+        action="store_true",
+        help="securely prompt for and store the configured webhook in macOS Keychain",
+    )
+    parser.add_argument(
         "--generate-launch-agent",
         metavar="PLIST_PATH",
         help="write a macOS LaunchAgent plist without installing it",
@@ -38,6 +44,21 @@ def main() -> int:
     args = parser.parse_args()
 
     config = load_config(args.config)
+    if args.store_discord_webhook:
+        notification = config.notification
+        if notification.type != "discord" or not notification.keychain_service:
+            parser.error(
+                "--store-discord-webhook requires Discord notification with keychain configuration"
+            )
+        store_keychain_secret(
+            notification.keychain_service, notification.keychain_account
+        )
+        log(
+            "discord_webhook_stored",
+            keychain_service=notification.keychain_service,
+            keychain_account=notification.keychain_account,
+        )
+        return 0
     if args.generate_launch_agent:
         path = generate_launch_agent(
             project_directory=str(Path.cwd()),

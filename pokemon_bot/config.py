@@ -1,5 +1,4 @@
 import json
-import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List
@@ -17,7 +16,9 @@ class RetailerConfig:
 @dataclass(frozen=True)
 class NotificationConfig:
     type: str
-    webhook_url: str = ""
+    webhook_env: str = ""
+    keychain_service: str = ""
+    keychain_account: str = ""
 
 
 @dataclass(frozen=True)
@@ -94,13 +95,22 @@ def load_config(path: str) -> Config:
     notification_raw = raw.get("notification", {"type": "console"})
     notification_type = notification_raw.get("type", "console")
     if notification_type == "discord":
-        env_name = notification_raw.get("webhook_env", "DISCORD_WEBHOOK_URL")
-        webhook_url = os.environ.get(env_name, "")
-        if not webhook_url:
-            raise ValueError("Discord webhook environment variable %s is not set" % env_name)
-        if not webhook_url.startswith("https://discord.com/api/webhooks/"):
-            raise ValueError("Discord webhook URL must use discord.com/api/webhooks")
-        notification = NotificationConfig("discord", webhook_url)
+        env_name = notification_raw.get("webhook_env", "")
+        keychain = notification_raw.get("keychain", {})
+        service = keychain.get("service", "") if isinstance(keychain, dict) else ""
+        account = keychain.get("account", "") if isinstance(keychain, dict) else ""
+        if bool(service) != bool(account):
+            raise ValueError("Discord keychain service and account are both required")
+        if bool(env_name) == bool(service):
+            raise ValueError(
+                "Discord notification must configure exactly one of webhook_env or keychain"
+            )
+        notification = NotificationConfig(
+            "discord",
+            webhook_env=env_name,
+            keychain_service=service,
+            keychain_account=account,
+        )
     elif notification_type == "console":
         notification = NotificationConfig("console")
     else:

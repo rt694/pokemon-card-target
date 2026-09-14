@@ -1,16 +1,21 @@
 import tempfile
 import unittest
 import plistlib
+import subprocess
 from pathlib import Path
+from unittest.mock import patch
 
 from pokemon_bot.checkout import DryRunCheckout
 from pokemon_bot.models import Offer, PurchaseRule
 from pokemon_bot.engine import deliver_pending_notifications
 from pokemon_bot.ingestion import InvalidOffer, ingest_target_file, normalize_target_record
 from pokemon_bot.notifications import DiscordNotifier, Notification
+from pokemon_bot.config import NotificationConfig
+from pokemon_bot.notifications import build_notifier
 from pokemon_bot.retailers import TargetFeedRetailer
 from pokemon_bot.rules import classify_product, evaluate, normalize_title
 from pokemon_bot.service import generate_launch_agent
+from pokemon_bot.secrets import read_keychain_secret, validate_discord_webhook_url
 from pokemon_bot.storage import PurchaseStore
 
 
@@ -130,6 +135,36 @@ class NotificationTests(unittest.TestCase):
         self.assertEqual(payload["embeds"][0]["url"], "https://www.pokemoncenter.com/product/1")
         self.assertEqual(payload["embeds"][0]["fields"][0]["value"], "$59.99")
         self.assertEqual(payload["allowed_mentions"], {"parse": []})
+
+    def test_discord_url_validation_rejects_lookalike_host(self) -> None:
+        with self.assertRaises(ValueError):
+            validate_discord_webhook_url(
+                "https://discord.com.example.org/api/webhooks/123/token"
+            )
+
+    def test_keychain_secret_is_used_to_build_notifier(self) -> None:
+        config = NotificationConfig(
+            "discord",
+            keychain_service="pokemon-card-target.discord",
+            keychain_account="webhook",
+        )
+        with patch(
+            "pokemon_bot.notifications.read_keychain_secret",
+            return_value="https://discord.com/api/webhooks/123/token",
+        ):
+            notifier = build_notifier(config)
+        self.assertEqual(
+            notifier.webhook_url, "https://discord.com/api/webhooks/123/token"
+        )
+
+    def test_missing_keychain_secret_has_clear_error(self) -> None:
+        error = subprocess.CalledProcessError(44, ["security"])
+
+        def failing_runner(*args, **kwargs):
+            raise error
+
+        with self.assertRaisesRegex(RuntimeError, "was not found in macOS Keychain"):
+            read_keychain_secret("service", "account", runner=failing_runner)
 
     def test_failed_notification_remains_pending_for_retry(self) -> None:
         class FailingNotifier:

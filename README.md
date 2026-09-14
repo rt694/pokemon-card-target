@@ -57,7 +57,8 @@ python3 -m pokemon_bot --config config.json --test-notification
 ```
 
 For Discord, create a webhook for your private channel, keep its URL out of files,
-and update `config.json` to use the environment variable:
+and update `config.json`. For a foreground terminal session, use an environment
+variable:
 
 ```json
 "notification": {
@@ -76,6 +77,31 @@ python3 -m pokemon_bot --config config.json
 
 Discord messages include a clickable product title for handoff to your normal
 browser. Never share or commit the webhook URL.
+
+For the macOS background service, store the webhook in Keychain instead. Change the
+notification configuration to:
+
+```json
+"notification": {
+  "type": "discord",
+  "keychain": {
+    "service": "pokemon-card-target.discord",
+    "account": "webhook"
+  }
+}
+```
+
+Then run this from an interactive terminal. macOS prompts for the webhook without
+putting it in shell history or process arguments:
+
+```bash
+python3 -m pokemon_bot --config config.json --store-discord-webhook
+python3 -m pokemon_bot --config config.json --test-notification
+```
+
+The monitor retrieves the secret with `/usr/bin/security` at startup. The first
+background access may cause macOS to request Keychain approval; approve access for
+the trusted local process only.
 
 Notifications use a durable SQLite outbox. If Discord or the network is temporarily
 unavailable, an unsent alert remains pending and is retried on the next scan.
@@ -97,8 +123,8 @@ python3 -m pokemon_bot --config config.json \
 ```
 
 Generation does not install or start the service. Review the plist first. Discord
-secrets are deliberately not written into it; notification credentials must be
-provided securely to the background process before installation.
+secrets are deliberately not written into it; use the Keychain configuration above
+before installation.
 
 ## Authorized Target feed intake
 
